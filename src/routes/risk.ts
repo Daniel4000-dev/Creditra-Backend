@@ -1,12 +1,12 @@
 import { Router } from 'express';
+import { validateBody } from '../middleware/validate.js';
+import { riskEvaluateSchema } from '../schemas/index.js';
+import type { RiskEvaluateBody } from '../schemas/index.js';
 
 export const riskRouter = Router();
 
-riskRouter.post('/evaluate', (req, res) => {
-  const { walletAddress } = req.body ?? {};
-  if (!walletAddress) {
-    return res.status(400).json({ error: 'walletAddress required' });
-  }
+riskRouter.post('/evaluate', validateBody(riskEvaluateSchema), (req, res) => {
+  const { walletAddress } = req.body as RiskEvaluateBody;
   res.json({
     walletAddress,
     riskScore: 0,

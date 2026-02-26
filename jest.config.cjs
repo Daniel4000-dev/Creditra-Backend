@@ -8,10 +8,18 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      tsconfig: {
+        isolatedModules: true,
+      },
     }],
   },
   collectCoverage: true,
   coverageDirectory: 'coverage',
+  collectCoverageFrom: [
+    'src/data/creditLines.ts',
+    'src/routes/credit.ts',
+    'src/utils/paginate.ts',
+  ],
   coverageThreshold: {
     global: {
       lines: 95,

@@ -17,8 +17,10 @@ import {
   getCreditLine,
   suspendCreditLine,
   closeCreditLine,
+  getTransactions,
   CreditLineNotFoundError,
   InvalidTransitionError,
+  type TransactionType,
   drawFromCreditLine
 } from "../services/creditService.js";
 
@@ -47,6 +49,8 @@ creditRouter.get('/lines', async (req, res) => {
 // Use a resolver function so API_KEYS is read lazily per-request,
 // allowing the env var to be set after module import (e.g. in tests).
 const requireApiKey = createApiKeyMiddleware(() => loadApiKeys());
+
+const VALID_TRANSACTION_TYPES: TransactionType[] = ["draw", "repayment", "status_change"];
 
 function handleServiceError(err: unknown, res: Response): void {
   if (err instanceof CreditLineNotFoundError) {
@@ -210,6 +214,58 @@ router.post(
 // ---------------------------------------------------------------------------
 // Admin endpoints – require a valid API key via `X-API-Key` header
 // ---------------------------------------------------------------------------
+
+creditRouter.get("/lines/:id/transactions", (req: Request, res: Response): void => {
+  const id = req.params["id"] as string;
+  const { type, from, to, page: pageParam, limit: limitParam } = req.query;
+
+  if (type !== undefined && !VALID_TRANSACTION_TYPES.includes(type as TransactionType)) {
+    fail(
+      res,
+      `Invalid type filter. Must be one of: ${VALID_TRANSACTION_TYPES.join(", ")}.`,
+      400,
+    );
+    return;
+  }
+
+  if (from !== undefined && isNaN(new Date(from as string).getTime())) {
+    fail(res, "Invalid 'from' date. Must be a valid ISO 8601 date.", 400);
+    return;
+  }
+
+  if (to !== undefined && isNaN(new Date(to as string).getTime())) {
+    fail(res, "Invalid 'to' date. Must be a valid ISO 8601 date.", 400);
+    return;
+  }
+
+  const page = pageParam !== undefined ? parseInt(pageParam as string, 10) : 1;
+  const limit = limitParam !== undefined ? parseInt(limitParam as string, 10) : 20;
+
+  if (isNaN(page) || page < 1) {
+    fail(res, "Invalid 'page'. Must be a positive integer.", 400);
+    return;
+  }
+
+  if (isNaN(limit) || limit < 1 || limit > 100) {
+    fail(res, "Invalid 'limit'. Must be between 1 and 100.", 400);
+    return;
+  }
+
+  try {
+    const result = getTransactions(
+      id,
+      {
+        type: type as TransactionType | undefined,
+        from: from as string | undefined,
+        to: to as string | undefined,
+      },
+      { page, limit },
+    );
+    ok(res, result);
+  } catch (err) {
+    handleServiceError(err, res);
+  }
+});
 
 /**
  * POST /api/credit/lines/:id/suspend

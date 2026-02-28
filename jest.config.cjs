@@ -13,6 +13,14 @@ module.exports = {
       },
     }],
   },
+  testMatch: [
+    "**/tests/**/*.test.ts",
+    "**/src/**/*.test.ts"
+  ],
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/dist/"
+  ],
   collectCoverage: true,
   coverageDirectory: 'coverage',
   collectCoverageFrom: [

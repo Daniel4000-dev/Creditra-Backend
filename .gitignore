@@ -1,8 +1,7 @@
 node_modules
 coverage
 dist
-.env
-.env.*
 .DS_Store
 *.log
 coverage/
+config.bat

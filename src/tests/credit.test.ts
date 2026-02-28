@@ -190,4 +190,10 @@ describe('paginateAndFilter utility - branch coverage', () => {
     expect(result.items).toHaveLength(1);
     expect(result.pageSize).toBe(1);
   });
+
+  it('filters out items with missing borrower when borrower filter is applied', () => {
+    const data = [{ id: '1', status: 'active' }]; // No borrower field
+    const result = paginateAndFilter(data, { borrower: 'somebody' }, { borrower: 'borrower' as any });
+    expect(result.total).toBe(0);
+  });
 });

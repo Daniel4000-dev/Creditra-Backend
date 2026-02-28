@@ -6,13 +6,7 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'istanbul',
-      include: [
-        'src/models/AuditLog.ts',
-        'src/repositories/interfaces/AuditLogRepository.ts',
-        'src/repositories/memory/InMemoryAuditLogRepository.ts',
-        'src/routes/audit.ts',
-        'src/services/AuditLogService.ts'
-      ],
+      include: ['src/**/*.ts'],
       exclude: [
         'src/index.ts',
         'src/**/__test__/**',

@@ -11,7 +11,6 @@ import { riskRouter } from './routes/risk.js';
 import { healthRouter } from './routes/health.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-import { ok } from './utils/response.js';
 import { auditRouter } from './routes/audit.js';
 import { Container } from './container/Container.js';
 import { AuditAction } from './models/AuditLog.js';
@@ -27,11 +26,12 @@ const port = process.env.PORT ?? 3000;
 app.use(cors());
 app.use(express.json());
 
+// Routes
 app.use('/health', healthRouter);
-// ── Docs ────────────────────────────────────────────────────────────────────
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 app.get('/docs.json', (_req, res) => res.json(openapiSpec));
 
+// Audit hooks for critical routes
 app.use('/api/credit', async (req, _res, next) => {
   if (req.method !== 'GET') {
     const container = Container.getInstance();
@@ -72,18 +72,17 @@ app.use('/api/credit', creditRouter);
 app.use('/api/risk', riskRouter);
 app.use('/api/audit', auditRouter);
 
-// Global error handler — must be registered after routes
+// Global error handler
 app.use(errorHandler);
 
 export { app };
 
-// Only start the server if not imported by tests setup
+// Only start the server if this file is run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  /* istanbul ignore next */
   if (process.env.NODE_ENV !== 'test') {
     app.listen(port, () => {
       console.log(`Creditra API listening on http://localhost:${port}`);
-      console.log(`Swagger UI available at  http://localhost:${port}/docs`);
+      console.log(`Swagger UI available at http://localhost:${port}/docs`);
     });
   }
 }

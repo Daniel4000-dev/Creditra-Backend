@@ -28,7 +28,10 @@ module.exports = {
     'src/repositories/interfaces/AuditLogRepository.ts',
     'src/repositories/memory/InMemoryAuditLogRepository.ts',
     'src/routes/audit.ts',
-    'src/services/AuditLogService.ts'
+    'src/services/AuditLogService.ts',
+    'src/data/creditLines.ts',
+    'src/routes/credit.ts',
+    'src/utils/paginate.ts'
   ],
   coverageThreshold: {
     global: {

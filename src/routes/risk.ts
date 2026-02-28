@@ -1,72 +1,100 @@
-import { Router, Request, Response } from 'express';
-import { Container } from '../container/Container.js';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
 import { validateBody } from '../middleware/validate.js';
 import { riskEvaluateSchema } from '../schemas/index.js';
+import type { RiskEvaluateBody } from '../schemas/index.js';
+import { Container } from '../container/Container.js';
 import { createApiKeyMiddleware } from '../middleware/auth.js';
 import { loadApiKeys } from '../config/apiKeys.js';
-import { ok, fail } from "../utils/response.js";
-import { isValidStellarPublicKey } from "../utils/stellarAddress.js";
+import { ok, fail } from '../utils/response.js';
 
 export const riskRouter = Router();
 const container = Container.getInstance();
+
+// Middleware for admin routes
 const requireApiKey = createApiKeyMiddleware(() => loadApiKeys());
 
-riskRouter.post('/evaluate', validateBody(riskEvaluateSchema), async (req, res) => {
-  try {
-    const { walletAddress, forceRefresh } = req.body ?? {};
-    if (!walletAddress) {
-      return res.status(400).json({ error: 'walletAddress required' });
-    }
-    const result = await container.riskEvaluationService.evaluateRisk({
-      walletAddress,
-      forceRefresh
-    });
-    res.json(result);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Risk evaluation failed';
-    res.status(500).json({ error: message });
-  }
-});
+/**
+ * POST /api/risk/evaluate
+ * Evaluate risk for a given wallet address.
+ */
+riskRouter.post(
+  '/evaluate',
+  validateBody(riskEvaluateSchema),
+  async (req: Request, res: Response) => {
+    try {
+      const { walletAddress, forceRefresh } = req.body as RiskEvaluateBody;
 
-riskRouter.get('/evaluations/:id', async (req, res) => {
+      if (!walletAddress) {
+        return fail(res, 'walletAddress is required', 400);
+      }
+
+      const result = await container.riskEvaluationService.evaluateRisk({
+        walletAddress,
+        forceRefresh,
+      });
+
+      return ok(res, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Risk evaluation failed';
+      return res.status(500).json({ error: message });
+    }
+  }
+);
+
+/**
+ * GET /api/risk/evaluations/:id
+ */
+riskRouter.get('/evaluations/:id', async (req: Request, res: Response) => {
   try {
     const evaluation = await container.riskEvaluationService.getRiskEvaluation(req.params.id);
     if (!evaluation) {
       return res.status(404).json({ error: 'Risk evaluation not found', id: req.params.id });
     }
-    res.json(evaluation);
+    return res.json(evaluation);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch risk evaluation' });
+    return res.status(500).json({ error: 'Failed to fetch risk evaluation' });
   }
 });
 
-riskRouter.get('/wallet/:walletAddress/latest', async (req, res) => {
+/**
+ * GET /api/risk/wallet/:walletAddress/latest
+ */
+riskRouter.get('/wallet/:walletAddress/latest', async (req: Request, res: Response) => {
   try {
     const evaluation = await container.riskEvaluationService.getLatestRiskEvaluation(req.params.walletAddress);
     if (!evaluation) {
       return res.status(404).json({ error: 'No risk evaluation found for wallet' });
     }
-    res.json(evaluation);
+    return res.json(evaluation);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch latest risk evaluation' });
+    return res.status(500).json({ error: 'Failed to fetch latest risk evaluation' });
   }
 });
 
-riskRouter.get('/wallet/:walletAddress/history', async (req, res) => {
+/**
+ * GET /api/risk/wallet/:walletAddress/history
+ */
+riskRouter.get('/wallet/:walletAddress/history', async (req: Request, res: Response) => {
   try {
     const { offset, limit } = req.query;
     const offsetNum = offset ? parseInt(offset as string) : undefined;
     const limitNum = limit ? parseInt(limit as string) : undefined;
+
     const evaluations = await container.riskEvaluationService.getRiskEvaluationHistory(
       req.params.walletAddress, offsetNum, limitNum
     );
-    res.json({ evaluations });
+
+    return res.json({ evaluations });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch risk evaluation history' });
+    return res.status(500).json({ error: 'Failed to fetch risk evaluation history' });
   }
 });
 
-riskRouter.post('/admin/recalibrate', requireApiKey, (_req: Request, res: Response): void => {
+/**
+ * Admin: Trigger recalibration
+ */
+riskRouter.post('/admin/recalibrate', requireApiKey, (_req: Request, res: Response) => {
   ok(res, { message: 'Risk model recalibration triggered' });
 });
 

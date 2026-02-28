@@ -4,9 +4,30 @@ import { creditRouter } from '../routes/credit.js';
 import { paginateAndFilter } from '../utils/paginate.js';
 import { creditLines } from '../data/creditLines.js';
 
+import { Container } from '../container/Container.js';
+import { CreditLineStatus } from '../models/CreditLine.js';
+
 const app = express();
 app.use(express.json());
 app.use('/api/credit', creditRouter);
+
+beforeAll(async () => {
+    const container = Container.getInstance();
+    const repo = (container.creditLineService as any).creditLineRepository;
+    repo.clear();
+    for (const raw of creditLines) {
+        repo.creditLines.set(raw.id, {
+            id: raw.id,
+            walletAddress: raw.borrower,
+            creditLimit: raw.creditLimit,
+            availableCredit: raw.creditLimit,
+            interestRateBps: raw.interestRateBps,
+            status: raw.status as CreditLineStatus,
+            createdAt: new Date(raw.createdAt),
+            updatedAt: new Date(raw.createdAt)
+        });
+    }
+});
 
 describe('GET /api/credit/lines - pagination', () => {
   it('returns all items with default pagination', async () => {
@@ -75,7 +96,7 @@ describe('GET /api/credit/lines - filtering', () => {
   it('filters by borrower exact match', async () => {
     const res = await request(app).get('/api/credit/lines?borrower=wallet_aaa');
     expect(res.body.total).toBe(1);
-    expect(res.body.items[0].borrower).toBe('wallet_aaa');
+    expect(res.body.items[0].walletAddress).toBe('wallet_aaa');
   });
 
   it('filters by borrower partial match', async () => {
@@ -111,12 +132,12 @@ describe('GET /api/credit/lines - sorting', () => {
 
   it('sorts by createdAt ascending by default', async () => {
     const res = await request(app).get('/api/credit/lines');
-    expect(res.body.items[0].createdAt).toBe('2024-01-01');
+    expect(new Date(res.body.items[0].createdAt).toISOString().startsWith('2024-01-01')).toBe(true);
   });
 
   it('defaults to asc for invalid sortDirection', async () => {
     const res = await request(app).get('/api/credit/lines?sortDirection=invalid');
-    expect(res.body.items[0].createdAt).toBe('2024-01-01');
+    expect(new Date(res.body.items[0].createdAt).toISOString().startsWith('2024-01-01')).toBe(true);
   });
 });
 
@@ -125,7 +146,7 @@ describe('GET /api/credit/lines/:id', () => {
     const res = await request(app).get('/api/credit/lines/1');
     expect(res.status).toBe(200);
     expect(res.body.id).toBe('1');
-    expect(res.body.borrower).toBe('wallet_aaa');
+    expect(res.body.walletAddress).toBe('wallet_aaa');
   });
 
   it('returns 404 for non-existent id', async () => {

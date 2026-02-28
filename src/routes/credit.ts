@@ -11,7 +11,7 @@ import { Container } from '../container/Container.js';
 import { createApiKeyMiddleware } from '../middleware/auth.js';
 import { loadApiKeys } from '../config/apiKeys.js';
 import { ok, fail } from "../utils/response.js";
-import { creditLines } from '../data/creditLines.js';
+// removed static creditLines import
 import { paginateAndFilter } from '../utils/paginate.js';
 import {
   CreditLineNotFoundError,
@@ -39,27 +39,30 @@ function handleServiceError(err: unknown, res: Response): void {
 creditRouter.get('/lines', async (req: Request, res: Response) => {
   try {
     const q = req.query;
-    // Use the paginate utility if pagination/filtering params are present
-    if (q.page || q.status || q.borrower || q.pageSize || q.sortBy) {
-      const result = paginateAndFilter(creditLines, q as any);
-      return res.json(result);
-    }
+    
+    // Fetch all lines from container
+    const allLines = await container.creditLineService.getAllCreditLines();
+    
+    // Map borrower filter sorting to walletAddress on the CreditLine model
+    const fieldMapping = {
+      borrower: 'walletAddress' as keyof typeof allLines[0]
+    };
 
-    // Fallback to Container logic for default requests
-    const offsetNum = q.offset ? parseInt(q.offset as string, 10) : 0;
-    const limitNum = q.limit ? parseInt(q.limit as string, 10) : 10;
+    const result = paginateAndFilter(allLines, q as any, fieldMapping);
     
-    const lines = await container.creditLineService.getAllCreditLines(offsetNum, limitNum);
-    const total = await container.creditLineService.getCreditLineCount();
-    
-    return res.json({ 
-      items: lines, 
-      creditLines: lines, 
-      total,
-      page: Math.floor(offsetNum / limitNum) + 1,
-      pageSize: limitNum,
-      pagination: { total, offset: offsetNum, limit: limitNum }
+    return res.json({
+        items: result.items,
+        creditLines: result.items, // backwards compatibility
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        pagination: {
+            total: result.total,
+            offset: (result.page - 1) * result.pageSize,
+            limit: result.pageSize
+        }
     });
+
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch credit lines' });
   }
@@ -81,11 +84,11 @@ creditRouter.get('/lines/:id', async (req: Request, res: Response) => {
 /** POST /lines */
 creditRouter.post('/lines', validateBody(createCreditLineSchema), async (req: Request, res: Response) => {
   try {
-    const { walletAddress, creditLimit, interestRateBps } = req.body as CreateCreditLineBody;
+    const { walletAddress, requestedLimit } = req.body as CreateCreditLineBody;
     const creditLine = await container.creditLineService.createCreditLine({
       walletAddress,
-      creditLimit,
-      interestRateBps: interestRateBps ?? 0
+      creditLimit: requestedLimit,
+      interestRateBps: 0
     });
     res.status(201).json(creditLine);
   } catch (error) {
@@ -96,11 +99,11 @@ creditRouter.post('/lines', validateBody(createCreditLineSchema), async (req: Re
 /** POST /lines/:id/draw */
 creditRouter.post('/lines/:id/draw', validateBody(drawSchema), async (req: Request, res: Response) => {
   try {
-    const { amount, borrowerId } = req.body as DrawBody;
+    const { amount, borrowerId } = req.body as DrawBody & { borrowerId?: string };
     const updated = drawFromCreditLine({
       id: req.params.id,
-      borrowerId,
-      amount,
+      borrowerId: borrowerId ?? "unknown",
+      amount: parseFloat(amount),
     });
     res.status(200).json({ message: 'Draw successful', creditLine: updated });
   } catch (err: any) {
